@@ -196,6 +196,7 @@ void start_enclave(const char* filename, uint32_t flags, enclave_stuff_t* stuff)
         OE_OK);
     OE_TEST(result == OE_OK);
 
+    /* Verify evidence without endorsements */
     OE_TEST(
         oe_verify_evidence(
             NULL,
@@ -208,6 +209,7 @@ void start_enclave(const char* filename, uint32_t flags, enclave_stuff_t* stuff)
             &stuff->claims,
             &stuff->claims_length) == OE_OK);
 
+    /* Verify evidence with endorsements */
     OE_TEST(
         oe_verify_evidence(
             NULL,
@@ -219,6 +221,26 @@ void start_enclave(const char* filename, uint32_t flags, enclave_stuff_t* stuff)
             0,
             &stuff->claims,
             &stuff->claims_length) == OE_OK);
+
+    /* Verify evidence with EEID endorsements, but without SGX endorsements */
+    size_t half_endorsements_size =
+        sizeof(oe_eeid_endorsements_t) + stuff->eeid->data_size;
+    oe_eeid_endorsements_t* half_endorsements = malloc(half_endorsements_size);
+    half_endorsements->sgx_endorsements_size = 0;
+    half_endorsements->eeid_endorsements_size = stuff->eeid->data_size;
+    memcpy(half_endorsements->data, stuff->eeid->data, stuff->eeid->data_size);
+    OE_TEST(
+        oe_verify_evidence(
+            NULL,
+            stuff->evidence,
+            stuff->evidence_out_size,
+            (uint8_t*)half_endorsements,
+            half_endorsements_size,
+            NULL,
+            0,
+            &stuff->claims,
+            &stuff->claims_length) == OE_OK);
+    free(half_endorsements);
 
     stuff->enclave_hash = NULL;
     for (size_t i = 0; i < stuff->claims_length; i++)

@@ -203,10 +203,9 @@ oe_result_t oe_eeid_ntoh(
 
 typedef struct
 {
-    size_t sgx_evidence_size;     /* Size of base-image evidence */
-    size_t sgx_endorsements_size; /* Size of base-image endorsements */
-    size_t eeid_size;             /* Size of EEID */
-    uint8_t data[];               /* Data (same order as the sizes) */
+    size_t sgx_evidence_size; /* Size of SGX evidence */
+    size_t eeid_size;         /* Size of EEID */
+    uint8_t data[];           /* Data (same order as the sizes) */
 } oe_eeid_evidence_t;
 
 /**
@@ -242,6 +241,40 @@ oe_result_t oe_eeid_evidence_ntoh(
     const uint8_t* buffer,
     size_t buffer_size,
     oe_eeid_evidence_t* evidence);
+
+/**
+ * Convert an oe_eeid_endorsements_t into a buffer using network byte-order.
+ *
+ * @param[in] endorsements The oe_eeid_endorsements_t to convert.
+ *
+ * @param[in] buffer The buffer to write to.
+ *
+ * @param[in] buffer_size Size of **buffer**.
+ *
+ * @returns Returns OE_OK on success.
+ *
+ */
+oe_result_t oe_eeid_endorsements_hton(
+    const oe_eeid_endorsements_t* endorsements,
+    uint8_t* buffer,
+    size_t buffer_size);
+
+/**
+ * Read an oe_eeid_endorsements_t from a buffer using host byte-order.
+ *
+ * @param[in] buffer The buffer to read from
+ *
+ * @param[in] buffer_size Size of **buffer**.
+ *
+ * @param[in] endorsements The oe_eeid_endorsements_t to convert to.
+ *
+ * @returns Returns OE_OK on success.
+ *
+ */
+oe_result_t oe_eeid_endorsements_ntoh(
+    const uint8_t* buffer,
+    size_t buffer_size,
+    oe_eeid_endorsements_t* endorsements);
 
 #endif /* OE_WITH_EXPERIMENTAL_EEID */
 
