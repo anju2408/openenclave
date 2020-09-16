@@ -192,13 +192,14 @@ static oe_result_t _eeid_get_evidence(
     // Write endorsements
     if (endorsements_buffer)
     {
-        size_t endorsements_size =
-            sizeof(oe_eeid_endorsements_t) + sgx_endorsements_buffer_size;
+        size_t endorsements_size = sizeof(oe_eeid_endorsements_t) +
+                                   sgx_endorsements_buffer_size +
+                                   eeid->data_size;
         endorsements = oe_malloc(endorsements_size);
         if (!endorsements)
             OE_RAISE(OE_OUT_OF_MEMORY);
         endorsements->sgx_endorsements_size = sgx_endorsements_buffer_size;
-        endorsements->eeid_endorsements_size = 0;
+        endorsements->eeid_endorsements_size = eeid->data_size;
 
         *endorsements_buffer_size = endorsements_size;
         *endorsements_buffer = oe_malloc(*endorsements_buffer_size);
@@ -207,9 +208,15 @@ static oe_result_t _eeid_get_evidence(
 
         OE_CHECK(oe_memcpy_s(
             endorsements->data,
-            sgx_endorsements_buffer_size,
+            endorsements_size,
             sgx_endorsements_buffer,
             sgx_endorsements_buffer_size));
+
+        OE_CHECK(oe_memcpy_s(
+            endorsements->data + endorsements->sgx_endorsements_size,
+            endorsements_size - endorsements->sgx_endorsements_size,
+            eeid->data,
+            eeid->data_size));
 
         OE_CHECK(oe_eeid_endorsements_hton(
             endorsements, *endorsements_buffer, *endorsements_buffer_size));

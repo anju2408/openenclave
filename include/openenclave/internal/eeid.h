@@ -262,7 +262,7 @@ oe_result_t oe_eeid_endorsements_hton(
 /**
  * Read an oe_eeid_endorsements_t from a buffer using host byte-order.
  *
- * @param[in] buffer The buffer to read from
+ * @param[in] buffer The buffer to read from.
  *
  * @param[in] buffer_size Size of **buffer**.
  *

@@ -193,7 +193,8 @@ static oe_result_t _verify_sgx_report(
     oe_datetime_t* time = NULL;
     oe_report_header_t* header = (oe_report_header_t*)report_buffer;
     oe_sgx_endorsements_t sgx_endorsements;
-    size_t sgx_claims_size = 0;
+    size_t expected_sgx_claims_length = 0, local_sgx_claims_length = 0;
+    oe_claim_t* local_sgx_claims = NULL;
     uint8_t* local_endorsements_buffer = NULL;
     size_t local_endorsements_buffer_size = 0;
 
@@ -206,10 +207,6 @@ static oe_result_t _verify_sgx_report(
             time = (oe_datetime_t*)policies[i].policy;
         }
     }
-
-    sgx_claims_size = sgx_evidence_buffer_size -
-                      (header->report_size + sizeof(oe_report_header_t));
-    *sgx_claims = oe_malloc(sgx_claims_size);
 
     if (sgx_endorsements_buffer == NULL)
     {
@@ -230,22 +227,32 @@ static oe_result_t _verify_sgx_report(
     OE_CHECK(oe_verify_quote_with_sgx_endorsements(
         header->report, header->report_size, &sgx_endorsements, time));
 
+    expected_sgx_claims_length =
+        sgx_evidence_buffer_size -
+        (header->report_size + sizeof(oe_report_header_t));
+
     OE_CHECK(oe_parse_report(
         sgx_evidence_buffer,
-        sgx_evidence_buffer_size - sgx_claims_size,
+        sgx_evidence_buffer_size - expected_sgx_claims_length,
         parsed_report));
 
     /* Extract SGX claims */
-    oe_sgx_extract_claims(
+    OE_CHECK(oe_sgx_extract_claims(
         SGX_FORMAT_TYPE_REMOTE,
         &context->base.format_id,
         header->report,
         header->report_size,
         header->report + header->report_size,
-        sgx_claims_size,
+        expected_sgx_claims_length,
         &sgx_endorsements,
-        sgx_claims,
-        sgx_claims_length);
+        &local_sgx_claims,
+        &local_sgx_claims_length));
+
+    if (sgx_claims && sgx_claims_length)
+    {
+        *sgx_claims = local_sgx_claims;
+        *sgx_claims_length = local_sgx_claims_length;
+    }
 
     result = OE_OK;
 
@@ -273,7 +280,9 @@ static oe_result_t _eeid_verify_evidence(
             *eeid_buffer = NULL;
     size_t sgx_evidence_buffer_size = 0, sgx_endorsements_buffer_size = 0,
            eeid_buffer_size = 0;
-    oe_eeid_t *attester_eeid = NULL, *verifier_eeid = NULL;
+    oe_eeid_t* attester_eeid = NULL;
+    uint8_t* verifier_eeid_data = NULL;
+    size_t verifier_eeid_data_size = 0;
     oe_eeid_evidence_t* evidence = NULL;
     oe_eeid_endorsements_t* endorsements = NULL;
 
@@ -308,6 +317,9 @@ static oe_result_t _eeid_verify_evidence(
     if (endorsements_buffer)
     {
         endorsements = oe_malloc(endorsements_buffer_size);
+        if (!endorsements)
+            OE_RAISE(OE_OUT_OF_MEMORY);
+
         OE_CHECK(oe_eeid_endorsements_ntoh(
             endorsements_buffer, endorsements_buffer_size, endorsements));
 
@@ -326,15 +338,16 @@ static oe_result_t _eeid_verify_evidence(
 
         if (endorsements->eeid_endorsements_size != 0)
         {
-            /* EEID passed to the verifier */
-            verifier_eeid = oe_memalign(
-                2 * sizeof(void*), endorsements->eeid_endorsements_size);
-            if (!verifier_eeid)
+            /* EEID data passed to the verifier */
+            verifier_eeid_data_size = endorsements->eeid_endorsements_size;
+            verifier_eeid_data =
+                oe_memalign(2 * sizeof(void*), verifier_eeid_data_size);
+            if (!verifier_eeid_data)
                 OE_RAISE(OE_OUT_OF_MEMORY);
             OE_CHECK(oe_memcpy_s(
-                verifier_eeid,
-                endorsements->eeid_endorsements_size,
-                endorsements->data + endorsements->eeid_endorsements_size,
+                verifier_eeid_data,
+                verifier_eeid_data_size,
+                endorsements->data + endorsements->sgx_endorsements_size,
                 endorsements->eeid_endorsements_size));
         }
     }
@@ -345,7 +358,6 @@ static oe_result_t _eeid_verify_evidence(
         if (!attester_eeid)
             OE_RAISE(OE_OUT_OF_MEMORY);
         OE_CHECK(oe_eeid_ntoh(eeid_buffer, eeid_buffer_size, attester_eeid));
-
         if (attester_eeid->version != OE_EEID_VERSION)
             OE_RAISE(OE_INVALID_PARAMETER);
     }
@@ -367,6 +379,8 @@ static oe_result_t _eeid_verify_evidence(
             &sgx_claims_length,
             &parsed_report));
 
+        oe_free_claims(sgx_claims, sgx_claims_length);
+
         const uint8_t* r_enclave_hash = parsed_report.identity.unique_id;
         const uint8_t* r_signer_id = parsed_report.identity.signer_id;
         uint16_t r_product_id = *((uint16_t*)parsed_report.identity.product_id);
@@ -374,18 +388,14 @@ static oe_result_t _eeid_verify_evidence(
         uint64_t r_attributes = parsed_report.identity.attributes;
         uint32_t r_id_version = parsed_report.identity.id_version;
 
-        oe_free_claims(sgx_claims, sgx_claims_length);
-
         /* Check that the enclave-reported EEID data matches the verifier's
          * expectation. */
-        if (verifier_eeid &&
-            (attester_eeid->data_size != verifier_eeid->data_size ||
-             attester_eeid->signature_size != verifier_eeid->signature_size ||
+        if (verifier_eeid_data &&
+            (attester_eeid->data_size != verifier_eeid_data_size ||
              memcmp(
                  attester_eeid->data,
-                 verifier_eeid->data,
-                 verifier_eeid->data_size + verifier_eeid->signature_size) !=
-                 0))
+                 verifier_eeid_data,
+                 verifier_eeid_data_size) != 0))
             OE_RAISE(OE_VERIFY_FAILED);
 
         /* Verify EEID */
@@ -421,7 +431,7 @@ done:
     oe_memalign_free(sgx_evidence_buffer);
     oe_memalign_free(sgx_endorsements_buffer);
     oe_memalign_free(attester_eeid);
-    oe_memalign_free(verifier_eeid);
+    oe_memalign_free(verifier_eeid_data);
     oe_free(evidence);
     oe_free(endorsements);
 
