@@ -538,11 +538,7 @@ done:
 }
 
 oe_result_t verify_eeid(
-    const uint8_t* reported_enclave_hash,
-    const uint8_t* reported_enclave_signer,
-    uint16_t reported_product_id,
-    uint32_t reported_security_version,
-    uint64_t reported_attributes,
+    const oe_eeid_relevant_sgx_claims_t* relevant_claims,
     const uint8_t** base_enclave_hash,
     const oe_eeid_t* eeid)
 {
@@ -563,13 +559,15 @@ oe_result_t verify_eeid(
 
     // Check recomputed enclave hash against reported enclave hash
     if (memcmp(
-            computed_enclave_hash.buf, reported_enclave_hash, OE_SHA256_SIZE) !=
-        0)
+            computed_enclave_hash.buf,
+            relevant_claims->enclave_hash,
+            OE_SHA256_SIZE) != 0)
         OE_RAISE(OE_VERIFY_FAILED);
 
     if (memcmp(
-            OE_DEBUG_PUBLIC_KEY, reported_enclave_signer, OE_SIGNER_ID_SIZE) !=
-        0)
+            OE_DEBUG_PUBLIC_KEY,
+            relevant_claims->signer_id,
+            OE_SIGNER_ID_SIZE) != 0)
         OE_RAISE(OE_VERIFY_FAILED);
 
     sigstruct =
@@ -594,11 +592,11 @@ oe_result_t verify_eeid(
 
     // Check other image properties have not changed
     base_debug = sigstruct->attributes.flags & SGX_FLAGS_DEBUG;
-    extended_debug = reported_attributes & OE_REPORT_ATTRIBUTES_DEBUG;
+    extended_debug = relevant_claims->attributes & OE_REPORT_ATTRIBUTES_DEBUG;
 
     if (base_debug != extended_debug ||
-        sigstruct->isvprodid != reported_product_id ||
-        sigstruct->isvsvn != reported_security_version)
+        sigstruct->isvprodid != relevant_claims->product_id ||
+        sigstruct->isvsvn != relevant_claims->security_version)
         OE_RAISE(OE_VERIFY_FAILED);
 
     // Check old signature (new signature has been checked above)

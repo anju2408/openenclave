@@ -29,6 +29,19 @@ static const uint8_t OE_DEBUG_PUBLIC_KEY[] = {
     0xce, 0x73, 0xe4, 0x33, 0x63, 0x83, 0x77, 0xf1, 0x79, 0xab, 0x44,
     0x56, 0xb2, 0xfe, 0x23, 0x71, 0x93, 0x19, 0x3a, 0x8d, 0xa};
 
+/** Struct to track EEID-relevant SGX claims. */
+typedef struct
+{
+    uint8_t* enclave_hash;
+    size_t enclave_hash_size;
+    uint8_t* signer_id;
+    size_t signer_id_size;
+    uint16_t product_id;
+    uint32_t security_version;
+    uint64_t attributes;
+    uint32_t id_version;
+} oe_eeid_relevant_sgx_claims_t;
+
 /**
  * Determine whether properties are those of a base image to be used with EEID
  *
@@ -113,20 +126,7 @@ oe_result_t oe_remeasure_memory_pages(
  * This function verifies the consistency of enclave hashes of base and extended
  * images, as well as the base image signature.
  *
- * @param[in] reported_enclave_hash Enclave hash of the extended image (as
- * reported in the oe_report_t).
- *
- * @param[in] reported_enclave_signer Enclave signer of the extended image (as
- * reported in the oe_report_t).
- *
- * @param[in] reported_product_id Product ID of the extended image (as reported
- * in the oe_report_t).
- *
- * @param[in] reported_security_version Security version of the extended image
- * (as reported in the oe_report_t).
- *
- * @param[in] reported_attributes Attributes of the extended image (as reported
- * in the oe_report_t).
+ * @param[in] relevant_claims EEID-relevant SGX claims.
  *
  * @param[in] eeid The oe_eeid_t holding all relevant information about the base
  * image.
@@ -137,11 +137,7 @@ oe_result_t oe_remeasure_memory_pages(
  *
  */
 oe_result_t verify_eeid(
-    const uint8_t* reported_enclave_hash,
-    const uint8_t* reported_enclave_signer,
-    uint16_t reported_product_id,
-    uint32_t reported_security_version,
-    uint64_t reported_attributes,
+    const oe_eeid_relevant_sgx_claims_t* relevant_claims,
     const uint8_t** base_enclave_hash,
     const oe_eeid_t* eeid);
 
