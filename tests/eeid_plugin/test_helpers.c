@@ -22,7 +22,7 @@ oe_result_t make_test_eeid(oe_eeid_t** eeid, size_t data_size)
     (*eeid)->version = 1;
     (*eeid)->data_size = data_size;
     for (size_t i = 0; i < data_size; i++)
-        (*eeid)->data[i] = 'a' + (i % 26);
+        (*eeid)->data[i] = (uint8_t)('a' + (i % 26));
     (*eeid)->data[data_size - 1] = 0;
     (*eeid)->size_settings.num_heap_pages = 110 + (data_size / OE_PAGE_SIZE);
     (*eeid)->size_settings.num_stack_pages = 50;
