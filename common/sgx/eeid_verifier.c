@@ -221,24 +221,27 @@ static oe_result_t _verify_sgx_report(
     OE_CHECK(oe_verify_quote_with_sgx_endorsements(
         header->report, header->report_size, &sgx_endorsements, time));
 
-    expected_sgx_claims_length =
-        sgx_evidence_buffer_size -
-        (header->report_size + sizeof(oe_report_header_t));
+    if (sgx_claims && sgx_claims_length)
+    {
+        expected_sgx_claims_length =
+            sgx_evidence_buffer_size -
+            (header->report_size + sizeof(oe_report_header_t));
 
-    /* Extract SGX claims */
-    OE_CHECK(oe_sgx_extract_claims(
-        SGX_FORMAT_TYPE_REMOTE,
-        &context->base.format_id,
-        header->report,
-        header->report_size,
-        header->report + header->report_size,
-        expected_sgx_claims_length,
-        &sgx_endorsements,
-        &local_sgx_claims,
-        &local_sgx_claims_length));
+        /* Extract SGX claims */
+        OE_CHECK(oe_sgx_extract_claims(
+            SGX_FORMAT_TYPE_REMOTE,
+            &context->base.format_id,
+            header->report,
+            header->report_size,
+            header->report + header->report_size,
+            expected_sgx_claims_length,
+            &sgx_endorsements,
+            &local_sgx_claims,
+            &local_sgx_claims_length));
 
-    *sgx_claims = local_sgx_claims;
-    *sgx_claims_length = local_sgx_claims_length;
+        *sgx_claims = local_sgx_claims;
+        *sgx_claims_length = local_sgx_claims_length;
+    }
 
     result = OE_OK;
 
